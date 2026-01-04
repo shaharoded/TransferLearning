@@ -15,6 +15,37 @@ def moving_average(values: list[float], window: int) -> float:
     return float(np.mean(values[-window:]))
 
 
+def is_episode_successful(ep_len: int, ep_reward: float, success_criterion: Optional[Dict[str, Any]], max_steps: int) -> bool:
+    """
+    Determine if an episode was successful based on the criterion.
+    Falls back to checking if episode finished early (len < max_steps).
+    """
+    if success_criterion is None:
+        return ep_len < max_steps  # Default: early termination = success
+    
+    metric_type = success_criterion.get("type", "length")
+    threshold = success_criterion.get("threshold")
+    comparison = success_criterion.get("comparison", "less")
+    
+    if metric_type == "length":
+        value = ep_len
+    elif metric_type == "reward":
+        value = ep_reward
+    else:
+        return ep_len < max_steps  # Fallback
+    
+    if comparison == "less":
+        return value < threshold
+    elif comparison == "less_equal":
+        return value <= threshold
+    elif comparison == "greater":
+        return value > threshold
+    elif comparison == "greater_equal":
+        return value >= threshold
+    else:
+        return ep_len < max_steps  # Fallback
+
+
 def train_actor_critic(
     *,
     env: gym.Env,
@@ -22,22 +53,25 @@ def train_actor_critic(
     max_episodes: int,
     max_steps_per_episode: int,
     ma_window: int,
-    target_reward: Optional[float] = None,
+    target_success_rate: Optional[float] = None,
+    success_criterion: Optional[Dict[str, Any]] = None,
     verbose: bool = True,
     print_every: int = 50,
     reset_seed_base: Optional[int] = None,
+    save_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generic trainer for one environment, using a pre-created agent and env.
 
-    Responsibilities:
-      - run episodes
-      - call agent.select_action and agent.step_update
-      - track metrics and convergence
-
-    Caller responsibilities:
-      - create/env wrap/seed as desired
-      - create agent with correct env_spec/hyperparams/architecture
+    Convergence: Stops when target_success_rate is reached (X% of recent episodes meet success_criterion)
+      
+    success_criterion: Dict specifying how to determine episode success.
+        Examples:
+        - {"type": "length", "threshold": 999, "comparison": "less"} # MountainCar: finishes early
+        - {"type": "length", "threshold": 475, "comparison": "greater_equal"} # CartPole: lasts long
+        - {"type": "reward", "threshold": -100, "comparison": "greater_equal"} # Acrobot: good reward
+    
+    If no target_success_rate provided, trains for max_episodes without early stopping.
     """
     rewards: list[float] = []
     ma_rewards: list[float] = []
@@ -51,6 +85,12 @@ def train_actor_critic(
     steps_trained = 0
     converged = False
     t0 = time.time()
+
+    # Set default save path using environment name
+    if save_path is None and hasattr(env, 'spec') and env.spec is not None:
+        save_path = f"models/{env.spec.id}.pth"
+    elif save_path is None:
+        save_path = "models/default_model.pth"
 
     for ep in range(1, max_episodes + 1):
         # Optional: deterministic-but-varying resets controlled by notebook
@@ -125,22 +165,46 @@ def train_actor_critic(
 
         if verbose and (ep == 1 or ep % print_every == 0):
             env_name = getattr(getattr(agent, "env_spec", None), "name", "env")
+            ma_len = moving_average(ep_steps, ma_window)
+            # Calculate success rate using configurable criterion
+            if len(ep_steps) >= ma_window:
+                recent_steps = ep_steps[-ma_window:]
+                recent_rewards = rewards[-ma_window:]
+                success_rate = sum(1 for i, s in enumerate(recent_steps) 
+                                  if is_episode_successful(s, recent_rewards[i], success_criterion, max_steps_per_episode)) / len(recent_steps)
+            else:
+                success_rate = sum(1 for i, s in enumerate(ep_steps) 
+                                  if is_episode_successful(s, rewards[i], success_criterion, max_steps_per_episode)) / len(ep_steps) if ep_steps else 0.0
+            
             print(
                 f"[{env_name}] ep={ep:4d} "
-                f"R={ep_reward:8.2f} "
-                f"MA({ma_window})={ma:8.2f} "
-                f"len={ep_len:4d}"
+                f"MA_R({ma_window})={ma:8.2f} "
+                f"MA_len({ma_window})={ma_len:6.1f} "
+                f"success_rate={success_rate:.2%}"
             )
 
-        if target_reward is not None and len(rewards) >= ma_window and ma >= target_reward:
-            converged = True
-            if verbose:
-                env_name = getattr(getattr(agent, "env_spec", None), "name", "env")
-                print(
-                    f"\n[{env_name}] Converged at episode {ep} "
-                    f"(MA({ma_window})={ma:.2f} >= {target_reward:.2f}).\n"
-                )
-            break
+        # Check convergence criteria
+        if target_success_rate is not None and len(rewards) >= ma_window:
+            # Calculate current success rate using configurable criterion
+            recent_steps = ep_steps[-ma_window:]
+            recent_rewards = rewards[-ma_window:]
+            current_success_rate = sum(1 for i, s in enumerate(recent_steps) 
+                                      if is_episode_successful(s, recent_rewards[i], success_criterion, max_steps_per_episode)) / len(recent_steps)
+            
+            if current_success_rate >= target_success_rate:
+                converged = True
+                if verbose:
+                    env_name = getattr(getattr(agent, "env_spec", None), "name", "env")
+                    print(
+                        f"\n[{env_name}] Converged at episode {ep} "
+                        f"(success_rate={current_success_rate:.2%} >= {target_success_rate:.2%})\n"
+                    )
+                
+                # Save model if path provided
+                if save_path is not None:
+                    agent.save_model(save_path)
+                
+                break
 
     return {
         "env_name": getattr(getattr(agent, "env_spec", None), "name", None),
@@ -149,7 +213,6 @@ def train_actor_critic(
         "episodes_trained": len(rewards),
         "steps_trained": steps_trained,
         "seconds_elapsed": float(time.time() - t0),
-        "target_reward": target_reward,
         "ma_window": ma_window,
         "rewards": rewards,
         "ma_rewards": ma_rewards,

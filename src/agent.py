@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional, Tuple, Sequence, Union, Dict, Any
 
 import numpy as np
@@ -165,3 +166,94 @@ class ActorCriticAgent(Agent):
             "v": float(v.mean().item()),
             "v_next": float(v_next.mean().item()),
         }
+
+    def save_model(self, path: Union[str, Path]) -> None:
+        """
+        Save actor, critic, env_spec, and config to a file.
+        
+        Args:
+            path: Path to save the model (will create parent directories if needed)
+        """
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Convert env_spec to dict for serialization
+        env_spec_dict = {
+            "name": self.env_spec.name,
+            "obs_dim": self.env_spec.obs_dim,
+            "state_dim": self.env_spec.state_dim,
+            "action_dim": self.env_spec.action_dim,
+            "valid_action_indices": self.env_spec.valid_action_indices,
+            "action_map": self.env_spec.action_map,
+        }
+        
+        # Convert config to dict
+        config_dict = {
+            "gamma": self.cfg.gamma,
+            "hidden_sizes": list(self.cfg.hidden_sizes),
+            "actor_lr": self.cfg.actor_lr,
+            "critic_lr": self.cfg.critic_lr,
+            "entropy_coef": self.cfg.entropy_coef,
+            "grad_clip_norm": self.cfg.grad_clip_norm,
+        }
+        
+        checkpoint = {
+            "actor_state_dict": self.actor.state_dict(),
+            "critic_state_dict": self.critic.state_dict(),
+            "env_spec": env_spec_dict,
+            "config": config_dict,
+        }
+        
+        torch.save(checkpoint, path)
+        print(f"✓ Model saved to {path}")
+
+    @classmethod
+    def load_model(cls, path: Union[str, Path], device: Optional[torch.device] = None) -> 'ActorCriticAgent':
+        """
+        Load a saved ActorCriticAgent from a file.
+        
+        Args:
+            path: Path to the saved model
+            device: Device to load the model on (defaults to cuda if available)
+            
+        Returns:
+            Loaded ActorCriticAgent instance
+        """
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Model file not found: {path}")
+        
+        checkpoint = torch.load(path, map_location=device or torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        
+        # Reconstruct EnvSpec
+        from src.adapters import EnvSpec
+        env_spec_dict = checkpoint["env_spec"]
+        env_spec = EnvSpec(
+            name=env_spec_dict["name"],
+            obs_dim=env_spec_dict["obs_dim"],
+            state_dim=env_spec_dict["state_dim"],
+            action_dim=env_spec_dict["action_dim"],
+            valid_action_indices=env_spec_dict["valid_action_indices"],
+            action_map=env_spec_dict["action_map"],
+        )
+        
+        # Reconstruct AgentConfig
+        config_dict = checkpoint["config"]
+        config = AgentConfig(
+            gamma=config_dict["gamma"],
+            hidden_sizes=tuple(config_dict["hidden_sizes"]),
+            actor_lr=config_dict["actor_lr"],
+            critic_lr=config_dict["critic_lr"],
+            entropy_coef=config_dict["entropy_coef"],
+            grad_clip_norm=config_dict["grad_clip_norm"],
+        )
+        
+        # Create agent
+        agent = cls(env_spec=env_spec, config=config, device=device)
+        
+        # Load state dicts
+        agent.actor.load_state_dict(checkpoint["actor_state_dict"])
+        agent.critic.load_state_dict(checkpoint["critic_state_dict"])
+        
+        print(f"✓ Model loaded from {path}")
+        return agent
