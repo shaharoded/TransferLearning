@@ -20,10 +20,10 @@ In this section we implemented a one-step Actor-Critic algorithm on three contro
   - Large goal completion bonus (+100) for reaching the flag
 - **Hyperparameter Tuning**: Used entropy_coef=0.10 for MountainCar (vs 0.01 for others) to reduce exploration after discovering successful strategies
 - **Success Criteria**: Defined task-specific success metrics:
-  - **CartPole**: Episode length $\geq$ 500 steps (full episode completion)  
-    $\rightarrow$ Similar difficulty to MA$_{100}$ episodes $\geq$ 475 demand
-  - **Acrobot**: Episode reward $\geq$ -100 (standard threshold)
-  - **MountainCar**: Episode length $<$ 999 steps (reaching flag before timeout)
+  - **CartPole**: Episode length ≥ 500 steps (full episode completion)  
+    → Similar difficulty to MA_100 episodes ≥ 475 demand
+  - **Acrobot**: Episode reward ≥ -100 (standard threshold)
+  - **MountainCar**: Episode length < 999 steps (reaching flag before timeout)
 - **Convergence Definition**: Target 95% success rate over moving average window of 100 episodes
 - **Model Persistence**: Automatic saving of converged models using environment names (e.g., `models/CartPole-v1.pth`)
 
