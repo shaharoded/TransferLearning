@@ -1,59 +1,76 @@
-# Deep Reinforcement Learning - Assignment 2
+# Deep Reinforcement Learning - Assignment 3
 
-Implementation and comparison of Policy Gradient algorithms (REINFORCE) on the CartPole-v1 task.
+## Training and Comparing Meta-Learning and Transfer-Learning using an Actor-Critic agent
 
-<img src="results/comparison.png" alt="Comparison: Moving Average Reward (Window=100)" width="700"/>
+## Introduction
 
-## Overview
+Deep reinforcement learning algorithms usually require a large number of trials. So far with the tools we have learned in this course, learning a new task entails re-collecting this large dataset and training from scratch. Intuitively, knowledge gained in learning one task should help to learn new, related tasks more quickly. Humans and animals are able to learn new tasks in just a few trials. In this assignment, we design a reinforcement learning algorithm that leverages prior experience to figure out how to solve new tasks quickly. In recent literature, such methods are referred to as meta-reinforcement learning [Mishra et al. 2018, Finn et al. 2017, Wang et al. 2016, Duan et al. 2016].
 
-This project implements the **REINFORCE** algorithm (Monte Carlo Policy Gradient), its variant **REINFORCE with Baseline**, and the **One-Step Actor-Critic** algorithm. The goal is to solve the `CartPole-v1` environment, where the agent must balance a pole on a cart. The environment is considered solved when the average reward over 100 consecutive episodes is at least 475.0.
+## Assignment Structure
+
+### Section 1: Training Individual Networks (25%)
+In this section, implement the actor-critic algorithm from HW2 on three control problems: CartPole-v1, Acrobot-v1, and MountainCarContinuous-v0. Achieve the respective goals: balancing the pole, reaching the mountain top, and bringing the acrobot to a pre-specified height.
+
+To facilitate transfer learning, ensure identical input and output sizes across tasks (pad inputs with 0s for smaller problems, have "empty" actions for smaller outputs).
+
+Notes:
+1. Retrain the architecture for CartPole to match sizes.
+2. Each architecture must include at least one hidden layer.
+
+- Provide statistics for running time and training iterations required for convergence on each task.
+
+### Section 2: Fine-Tuning an Existing Model (25%)
+Fine-tune models trained on one problem to apply to another. For pairs: Acrobot -> CartPole, CartPole -> MountainCar:
+- Take the fully trained source model, reinitialize output layer weights.
+- Train on the target task.
+- Provide statistics on running time and iterations. Compare to Section 1 results. Did fine-tuning lead to faster convergence?
+
+### Section 3: Transfer Learning (50%)
+Implement a simplified Progressive Networks approach. For settings: {Acrobot, MountainCar} -> CartPole and {CartPole, Acrobot} -> MountainCar:
+- Connect fully-trained source networks to the untrained target network (sources remain frozen).
+- Connect hidden layers appropriately (top layers first, then lower if multiple).
+- Train until convergence. Did transfer learning improve training? Provide statistics.
+
+Important: Transfer learning can be tricky; document efforts even if not successful.
 
 ## Project Structure
 ```
 Root/
 ├── src/
-│   ├── init.py                         # Package initialization
-│   ├── agent.py                        # Agent implementations
-│   │   ├── Agent                       # Base class (Sampling logic)
-│   │   ├── ReinforceAgent              # Vanilla REINFORCE
-│   │   ├── ReinforceBaselineAgent      # REINFORCE with Value Baseline
-│   │   └── ActorCriticAgent            # One-Step Actor-Critic
-│   ├── ffnn.py                         # Neural network architectures
-│   │   ├── PolicyNetwork               # Actor (Policy)
-│   │   ├── ValueNetwork                # Critic (Baseline)
-│   └── utils.py                        # Utilities (Return calculation)
+│   ├── adapters.py                     # Environment adapters for unified I/O
+│   ├── agent.py                        # Actor-Critic agent implementation
+│   ├── ffnn.py                         # Feed-forward neural networks
+│   ├── train.py                        # Training functions
+│   ├── training_utils.py               # Utilities for plotting and analysis
+│   └── __pycache__/                    # Python cache
 ├── mainColab.ipynb                     # Main notebook for training and evaluation
 ├── results/                            # Training outputs (plots, summaries)
 ├── models/                             # Saved model checkpoints
-└── requirements.txt                    # Python dependencies
+├── requirements.txt                    # Python dependencies
+└── README.md                           # This file
 ```
 
 ## Algorithms
 
-### 1. Vanilla REINFORCE
-The standard Monte Carlo Policy Gradient algorithm.
-- **Update Rule**: $\nabla J(\theta) \approx \sum \nabla \log \pi(a_t|s_t) \cdot G_t$
-- Uses the actual discounted return $G_t$ as an unbiased but high-variance estimate of the gradient.
+### Actor-Critic
+The one-step actor-critic algorithm updates policy and value function at every step.
+- **Critic**: Learns value function using TD learning.
+- **Actor**: Updates policy using TD-error as advantage.
+- **Entropy Regularization**: Encourages exploration.
 
-### 2. REINFORCE with Baseline
-Improves upon vanilla REINFORCE by subtracting a state-dependent baseline $V(s)$ from the return.
-- **Update Rule**: $\nabla J(\theta) \approx \sum \nabla \log \pi(a_t|s_t) \cdot (G_t - V(s_t))$
-- **Advantage**: $(G_t - V(s_t))$ reduces variance without introducing bias.
-- **Value Network**: A separate neural network learns to approximate $V(s)$ by minimizing MSE against $G_t$.
-
-### 3. One-Step Actor-Critic
-An online algorithm that updates the policy and value function at every step, rather than at the end of the episode.
-- **Update Rule**: Uses the TD-error $\delta_t = R_{t+1} + \gamma V(s_{t+1}) - V(s_t)$ as the advantage estimate.
-- **Critic**: Learns $V(s)$ online using TD learning.
-- **Actor**: Updates policy using $\delta_t$ as the critic's evaluation of the action.
-- **Entropy Regularization**: Adds an entropy term to the loss to encourage exploration and prevent premature convergence.
+### Transfer Learning Methods
+- **Fine-Tuning**: Retrain a pre-trained model on a new task by reinitializing output layer.
+- **Progressive Networks**: Connect multiple source networks to a target, freezing sources.
 
 ## Usage
 
-Open `mainColab.ipynb` to run the full training and evaluation pipeline.
+Open `mainColab.ipynb` to run the training and evaluation pipeline.
 The notebook covers:
-1.  Environment setup.
-2.  Training Vanilla REINFORCE.
-3.  Training REINFORCE with Baseline.
-4.  Training One-Step Actor-Critic.
-5.  Comparative analysis of convergence speed and stability.
+1. Environment setup and adapters.
+2. Training individual networks (Section 1).
+3. Fine-tuning models (Section 2).
+4. Transfer learning (Section 3).
+5. Comparative analysis.
+
+## Results
+[To be added after experiments]

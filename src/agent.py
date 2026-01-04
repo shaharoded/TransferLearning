@@ -33,6 +33,7 @@ class Agent:
     def __init__(self, env_spec: EnvSpec, device: Optional[torch.device] = None, seed: Optional[int] = None):
         self.env_spec = env_spec
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"✓ Agent device: {self.device}")
         self.rng = np.random.default_rng(seed)
 
         if seed is not None:
