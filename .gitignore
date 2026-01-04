@@ -1,0 +1,16 @@
+# Assignment PDFs
+*.pdf
+
+# *.docx
+markdown/
+
+# Python
+__pycache__/
+
+# Virtual Environments
+.venv/
+
+# Training artifacts
+models/*.pth
+models/*.npz
+models/
