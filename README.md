@@ -9,7 +9,10 @@ Deep reinforcement learning algorithms usually require a large number of trials,
 ## Assignment Structure
 
 ### Section 1: Training Individual Networks
-In this section we implemented a one-step Actor-Critic algorithm on three control problems: CartPole-v1, Acrobot-v1, and MountainCarContinuous-v0.
+In this section we implemented a one-step Actor-Critic algorithm on three control problems: 
+    1. CartPole-v1
+    2. Acrobot-v1
+    3. MountainCarContinuous-v0
 
 **Technical Implementation:**
 - **Unified Architecture**: All tasks use identical network dimensions (state_dim=6, action_dim=5) with input padding for smaller observation spaces and action masking for unused actions
