@@ -14,4 +14,3 @@ __pycache__/
 models/*.pth
 models/*.npz
 models/
-results/
