@@ -257,3 +257,41 @@ class ActorCriticAgent(Agent):
         
         print(f"✓ Model loaded from {path}")
         return agent
+    
+    def _get_last_linear(self, net: nn.Sequential) -> nn.Linear:
+        """Helper to get last nn.Linear layer from a sequential model."""
+        last = net[-1]
+        if not isinstance(last, nn.Linear):
+            raise TypeError("Expected last layer to be nn.Linear")
+        return last
+
+
+    def reinit_actor_head(self) -> None:
+        """Reinitialize ONLY the actor output layer."""
+        head = self._get_last_linear(self.actor.net)
+        nn.init.orthogonal_(head.weight, gain=0.01)
+        nn.init.zeros_(head.bias)
+
+
+    def reinit_critic_head(self) -> None:
+        """Reinitialize ONLY the critic output layer."""
+        head = self._get_last_linear(self.critic.net)
+        nn.init.orthogonal_(head.weight, gain=1.0)
+        nn.init.zeros_(head.bias)
+
+
+    def reinit_output_layers(self, *, actor: bool = True, critic: bool = True) -> None:
+        """Convenience wrapper for Part 2."""
+        if actor:
+            self.reinit_actor_head()
+        if critic:
+            self.reinit_critic_head()
+
+
+    def load_trunks_from(self, source: "ActorCriticAgent") -> None:
+        """
+        Copy all weights from source into self (same architecture assumed).
+        After calling, you typically reinit heads.
+        """
+        self.actor.load_state_dict(source.actor.state_dict())
+        self.critic.load_state_dict(source.critic.state_dict())

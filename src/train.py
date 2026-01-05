@@ -6,6 +6,9 @@ from typing import Any, Dict, Optional
 import numpy as np
 import gymnasium as gym
 
+from src.agent import ActorCriticAgent, AgentConfig
+from src.adapters import EnvSpec
+
 
 def moving_average(values: list[float], window: int) -> float:
     if not values:
@@ -222,3 +225,62 @@ def train_actor_critic(
         "entropy": entropy_ep,
         "td_error": td_error_ep,
     }
+
+def finetune_actor_critic(
+    *,
+    source_ckpt_path: str,
+    target_env: gym.Env,
+    target_env_spec: EnvSpec,
+    seed: int,
+    max_episodes: int,
+    max_steps_per_episode: int,
+    ma_window: int,
+    target_success_rate: Optional[float] = None,
+    success_criterion: Optional[Dict[str, Any]] = None,
+    agent_cfg: Optional[AgentConfig] = None,
+    verbose: bool = True,
+    print_every: int = 50,
+    reset_seed_base: Optional[int] = None,
+    save_path: Optional[str] = None,
+    reinit_actor_head: bool = True,
+    reinit_critic_head: bool = True,
+) -> Dict[str, Any]:
+    """
+    Fine-tune a source-trained actor-critic on a target task
+    by reusing the representation and reinitializing output layers.
+    """
+    # 1) Load source agent
+    source_agent = ActorCriticAgent.load_model(source_ckpt_path)
+
+    # 2) Decide configuration
+    if agent_cfg is None:
+        agent_cfg = source_agent.cfg
+
+    # 3) Build fresh target agent (correct env_spec + mask)
+    target_agent = ActorCriticAgent(
+        env_spec=target_env_spec,
+        config=agent_cfg,
+        seed=seed,
+    )
+
+    # 4) Transfer trunks and reinit heads
+    target_agent.load_trunks_from(source_agent)
+    target_agent.reinit_output_layers(
+        actor=reinit_actor_head,
+        critic=reinit_critic_head,
+    )
+
+    # 5) Train using success-rate convergence
+    return train_actor_critic(
+        env=target_env,
+        agent=target_agent,
+        max_episodes=max_episodes,
+        max_steps_per_episode=max_steps_per_episode,
+        ma_window=ma_window,
+        target_success_rate=target_success_rate,
+        success_criterion=success_criterion,
+        verbose=verbose,
+        print_every=print_every,
+        reset_seed_base=reset_seed_base,
+        save_path=save_path,
+    )

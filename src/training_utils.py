@@ -201,3 +201,16 @@ def plot_diagnostics_grid(
 
     plt.tight_layout()
     plt.show()
+
+
+def compare_runs(baseline_summary, finetune_summary):
+    return {
+        "baseline_episodes": baseline_summary["episodes"],
+        "finetune_episodes": finetune_summary["episodes"],
+        "baseline_seconds": baseline_summary["seconds"],
+        "finetune_seconds": finetune_summary["seconds"],
+        "baseline_steps": baseline_summary["steps"],
+        "finetune_steps": finetune_summary["steps"],
+        "speedup_ep": (baseline_summary["episodes"] / finetune_summary["episodes"]) if finetune_summary["episodes"] else None,
+        "speedup_time": (baseline_summary["seconds"] / finetune_summary["seconds"]) if finetune_summary["seconds"] else None,
+    }

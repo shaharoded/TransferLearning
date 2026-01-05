@@ -35,11 +35,26 @@ All agents converged within 1000-2000 episodes, demonstrating effective learning
 <img src="results/part1_plots.png" alt="Agents training Process" width="700"/>
 
 
-### Section 2: Fine-Tuning an Existing Model
-Will Fine-tune models trained on one problem to apply to another. For pairs: Acrobot -> CartPole, CartPole -> MountainCar:
-- Take the fully trained source model, reinitialize output layer weights.
-- Train on the target task.
-- Provide statistics on running time and iterations. Compare to Section 1 results. Did fine-tuning lead to faster convergence?
+### Section 2: Fine-Tuning an Existing Model (25%)
+Fine-tuned models trained on one problem to apply to another. For pairs: Acrobot → CartPole, CartPole → MountainCar:
+
+**Methodology:**
+- Loaded fully trained source models from Section 1
+- Re-initialized output layer weights for both actor and critic networks (found to work better than actor-only re-initialization)
+- Maintained source model's hidden layer weights to preserve learned features
+- Trained on target tasks with same hyperparameters as Section 1
+
+**Results:**
+- **Convergence Time**: Remained similar to Section 1 baselines
+- **Stability**: Fine-tuned models showed steadier learning curves with less variance
+- **Performance**: Re-initializing both actor and critic output layers provided better results than actor-only re-initialization
+- **Comparison**: Fine-tuning did not significantly accelerate convergence but provided more stable training
+
+The results suggest that while fine-tuning preserves some useful features from source tasks, the architectural differences between control problems may limit transfer benefits.
+
+<img src="results/part2_cartpole_plots.png" alt="Cartpole Training Comparison" width="700"/>
+
+<img src="results/part2_mountaincar_plots.png" alt="Mountaincar Training Comparison" width="700"/>
 
 ### Section 3: Transfer Learning
 Will Implement a simplified Progressive Networks approach. For settings: {Acrobot, MountainCar} -> CartPole and {CartPole, Acrobot} -> MountainCar:
