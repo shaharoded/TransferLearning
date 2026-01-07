@@ -101,6 +101,7 @@ def plot_training_curves_grid(
     show_ma: bool = True,
     grid_shape: Tuple[int, int] = (1, 3),
     figsize: Tuple[int, int] = (18, 4),
+    save_path: Optional[str] = None,
 ) -> None:
     """
     Plots multiple envs in ONE figure with multiple panels (subplots).
@@ -157,6 +158,9 @@ def plot_training_curves_grid(
         axes[j].axis("off")
 
     plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"✓ Figure saved to {save_path}")
     plt.show()
 
 
@@ -164,9 +168,11 @@ def plot_diagnostics_grid(
     histories: Dict[str, Dict[str, Any]],
     *,
     order: Optional[Sequence[str]] = None,
+    titles: Optional[Dict[str, str]] = None,
     keys: Sequence[str] = ("actor_loss", "critic_loss", "entropy", "td_error"),
     grid_shape: Tuple[int, int] = (1, 3),
     figsize: Tuple[int, int] = (18, 4),
+    save_path: Optional[str] = None,
 ) -> None:
     """
     ONE figure with multiple panels: diagnostics per env.
@@ -191,7 +197,8 @@ def plot_diagnostics_grid(
             if k in h:
                 ax.plot(x, h[k], label=k)
 
-        ax.set_title(f"{env_name} diagnostics")
+        t = titles[env_name] if titles and env_name in titles else f"{env_name} diagnostics"
+        ax.set_title(t)
         ax.set_xlabel("Episode")
         ax.grid(True)
         ax.legend()
@@ -200,6 +207,9 @@ def plot_diagnostics_grid(
         axes[j].axis("off")
 
     plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"✓ Figure saved to {save_path}")
     plt.show()
 
 

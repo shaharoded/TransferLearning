@@ -56,13 +56,55 @@ The results suggest that while fine-tuning preserves some useful features from s
 
 <img src="results/part2_mountaincar_plots.png" alt="Mountaincar Training Comparison" width="700"/>
 
-### Section 3: Transfer Learning
-Will Implement a simplified Progressive Networks approach. For settings: {Acrobot, MountainCar} -> CartPole and {CartPole, Acrobot} -> MountainCar:
-- Connect fully-trained source networks to the untrained target network (sources remain frozen).
-- Connect hidden layers appropriately (top layers first, then lower if multiple).
-- Train until convergence. Did transfer learning improve training? Provide statistics.
+### Section 3: Transfer Learning with Progressive Networks
+Implemented a simplified Progressive Networks approach for multi-source transfer learning.
 
-Important: Transfer learning can be tricky; document efforts even if not successful.
+**Scenarios:**
+- **Scenario A**: {Acrobot, MountainCar} → CartPole
+- **Scenario B**: {CartPole, Acrobot} → MountainCar
+
+**Architecture:**
+Progressive Networks leverage knowledge from multiple pre-trained source models by:
+1. **Freezing Source Networks**: All source model parameters remain fixed during training
+2. **Feature Extraction**: Input states pass through all source models' hidden layers
+3. **Lateral Connections**: Source features are concatenated with target features
+4. **New Output Heads**: Fresh actor/critic heads trained on the fused representation
+
+```
+Input State (x)
+    │
+    ├──► Source 1 Hidden (frozen) ──► h₁
+    ├──► Source 2 Hidden (frozen) ──► h₂
+    └──► Target Hidden (trainable) ─► h_target
+                                        │
+                    ┌───────────────────┴───────────────────┐
+                    │  Concatenate: [h_target, h₁, h₂, ...]  │
+                    └───────────────────┬───────────────────┘
+                                        │
+                            ┌───────────┴───────────┐
+                            │                       │
+                    Actor Head (new)         Critic Head (new)
+```
+
+**Technical Implementation:**
+- **Unified Input Handling**: Zero-padding applied for environments with smaller state dimensions
+- **Fused Feature Dimension**: Target hidden (128) + Source1 hidden (128) + Source2 hidden (128) = 384D
+- **Trainable Parameters**: Only target trunk and new output heads are optimized
+- **Same Convergence Criteria**: 95% success rate over 100-episode moving window
+
+**Results:**
+
+<img src="results/part3_cartpole_plots.png" alt="Progressive CartPole Training Comparison" width="700"/>
+
+<img src="results/part3_mountaincar_plots.png" alt="Progressive MountainCar Training Comparison" width="700"/>
+
+<img src="results/part3_diagnostics.png" alt="Progressive Networks Diagnostics" width="700"/>
+
+**Analysis:**
+- Progressive Networks provide richer initial representations from multiple source tasks
+- The frozen source features act as complementary "perspectives" on the input state
+- Avoids catastrophic forgetting since source weights are never modified
+- Performance depends on similarity between source and target task dynamics
 
 ## Project Structure
 ```
@@ -71,6 +113,7 @@ Root/
 │   ├── adapters.py                     # Environment adapters for unified I/O and action discretization
 │   ├── agent.py                        # Actor-Critic agent with save/load functionality
 │   ├── ffnn.py                         # Feed-forward neural networks (PolicyNetwork, ValueNetwork)
+│   ├── progressive.py                  # Progressive Networks for multi-source transfer learning
 │   ├── train.py                        # Training functions with success rate convergence
 │   ├── training_utils.py               # Utilities for plotting and analysis
 │   └── wrappers.py                     # Reward shaping wrappers (MountainCarRewardShaping)
