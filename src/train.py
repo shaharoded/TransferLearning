@@ -7,7 +7,7 @@ import numpy as np
 import gymnasium as gym
 
 from src.agent import ActorCriticAgent, AgentConfig
-from src.adapters import EnvSpec
+from src.task_adapters import EnvSpec
 
 
 def moving_average(values: list[float], window: int) -> float:

@@ -17,7 +17,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from src.adapters import EnvSpec, build_action_mask, mask_logits, map_action, pad_obs
+from task_adapters import EnvSpec, build_action_mask, mask_logits, map_action, pad_obs
 from src.agent import ActorCriticAgent, AgentConfig
 
 

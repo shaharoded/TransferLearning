@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple, Sequence, Union, Dict, Any
+from typing import Optional, Tuple, Sequence, Union, Dict, Any, List
 
 import numpy as np
 import torch
@@ -10,8 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from src.ffnn import PolicyNetwork, ValueNetwork
-from src.adapters import EnvSpec, build_action_mask, mask_logits, map_action, pad_obs
+from src.ffnn import PolicyNetwork, ValueNetwork, ProgressiveWrapper
+from src.task_adapters import EnvSpec, build_action_mask, mask_logits, map_action, pad_obs
 
 
 @dataclass
@@ -226,7 +226,6 @@ class ActorCriticAgent(Agent):
         checkpoint = torch.load(path, map_location=device or torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         
         # Reconstruct EnvSpec
-        from src.adapters import EnvSpec
         env_spec_dict = checkpoint["env_spec"]
         env_spec = EnvSpec(
             name=env_spec_dict["name"],
@@ -295,3 +294,42 @@ class ActorCriticAgent(Agent):
         """
         self.actor.load_state_dict(source.actor.state_dict())
         self.critic.load_state_dict(source.critic.state_dict())
+    
+
+class ProgressiveAgent(ActorCriticAgent):
+    """
+    Inherits everything (step_update, select_action, save_model) from ActorCriticAgent.
+    Only overrides __init__ to build the specialized network for the progressive setting.
+    """
+    def __init__(
+        self,
+        env_spec,
+        source_agents,
+        config=None,
+        device=None,
+        seed=None,
+    ):
+        # Initialize the base agent (sets up device, config, env_spec)
+        # Pass dummy hidden_sizes because we will overwrite the nets anyway
+        super().__init__(env_spec, config, device, seed)
+
+        # OVERWRITE the standard networks with the Progressive ones
+        self.progressive_net = ProgressiveWrapper(
+            target_agent=self, # Pass self as the "fresh" target
+            source_agents=source_agents
+        ).to(self.device)
+
+        # Hook the progressive parts into the standard names
+        # The base Agent expects self.actor and self.critic to be callables
+        self.actor = self.progressive_net.actor
+        self.critic = self.progressive_net.critic
+
+        # Re-initialize optimizers because the parameters changed        
+        # Get trainable params only (frozen sources are ignored)
+        actor_params = [p for p in self.actor.parameters() if p.requires_grad]
+        critic_params = [p for p in self.critic.parameters() if p.requires_grad]
+
+        self.actor_opt = torch.optim.Adam(actor_params, lr=self.cfg.actor_lr)
+        self.critic_opt = torch.optim.Adam(critic_params, lr=self.cfg.critic_lr)
+        
+        print(f"✓ Progressive Agent Re-initialized successfully")
